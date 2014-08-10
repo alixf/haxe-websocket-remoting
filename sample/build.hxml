@@ -1,0 +1,11 @@
+-main Server
+-js bin/server.js
+-lib nodejs
+-lib haxe-websocket-remoting
+
+--next
+-main Client
+-lib nodejs
+-lib haxe-websocket-remoting
+-dce full
+-js bin/client.js
