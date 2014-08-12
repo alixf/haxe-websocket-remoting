@@ -16,52 +16,71 @@ This sample is located in the sample directory, you can build by running `haxe b
 ####Client.hx
 
 ```haxe
-public function new()
-{
-    var socket : Socket = cast Io.connect("http://localhost:11258");
-    socket.on(Remote.callEvent, function (data) {
-        Remote.handleRequest(this, data, socket);
-    });
+class ServerRemote extends Remote<Server> { }
 
-    var remote = new ServerRemote();
-    remote.socket = socket;
-    remote.foo(56, function() { trace("foo finished"); } );
-}
-
-@:keep public function bar(arg1 : String)
+class Client
 {
-    trace('function bar called on client with arg1 = $arg1');
+    public function new()
+    {
+        var socket : Socket = cast Io.connect("http://localhost:11258");
+        socket.on(Remote.callEvent, function (data) {
+            Remote.handleRequest(this, data, socket);
+        });
+
+        var remote = new ServerRemote();
+        remote.socket = socket;
+        remote.foo(56, function() { trace("foo finished"); } );
+    }
+
+    @:keep public function bar(arg1 : String)
+    {
+        trace('function bar called on client with arg1 = $arg1');
+    }
 }
 ```
 
 ####Server.hx
 ```haxe
-public function new()
+
+class ClientRemote extends Remote<Client> { }
+
+typedef ServerClient = 
 {
-    var http : NodeHttp = js.Node.http;
-    function handler(req : NodeHttpServerReq, resp : NodeHttpServerResp) { resp.end(); }
-    var httpServer = http.createServer(handler);
-    httpServer.listen(11258);
-
-    var io = js.Node.require("socket.io")(httpServer);
-    io.on('connection', function (socket : Socket)
-    {
-        var remote = new ClientRemote();
-        remote.socket = socket;
-        clients.set(socket, { remote : remote } );
-        remote.bar("called on connection", function() { trace('bar finished.'); } );
-
-        socket.on(Remote.callEvent, function (data)
-        {
-            currentClient = clients.get(socket);
-            Remote.handleRequest(this, data, socket);
-        });
-    });
+    var remote : ClientRemote;
 }
 
-@:keep public function foo(arg1 : Int)
+class Server
 {
-    trace('function foo called on server with arg1 = $arg1');
-    currentClient.remote.bar("called on foo", function() { trace('bar finished.'); } );
+    private var clients = new Map<Socket, ServerClient>();
+    private var currentClient : ServerClient;
+    
+    public function new()
+    {
+        var http : NodeHttp = js.Node.http;
+        function handler(req : NodeHttpServerReq, resp : NodeHttpServerResp) { resp.end(); }
+        var httpServer = http.createServer(handler);
+        httpServer.listen(11258);
+
+        var io = js.Node.require("socket.io")(httpServer);
+        io.on('connection', function (socket : Socket)
+        {
+            var remote = new ClientRemote();
+            remote.socket = socket;
+            clients.set(socket, { remote : remote } );
+            remote.bar("called on connection", function() { trace('bar finished.'); } );
+
+            socket.on(Remote.callEvent, function (data)
+            {
+                currentClient = clients.get(socket);
+                Remote.handleRequest(this, data, socket);
+            });
+        });
+    }
+
+    @:keep public function foo(arg1 : Int)
+    {
+        trace('function foo called on server with arg1 = $arg1');
+        currentClient.remote.bar("called on foo", function() { trace('bar finished.'); } );
+    }   
 }
 ```
